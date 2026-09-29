@@ -1,6 +1,6 @@
 # Desktop Sparkles
 
-A beautiful animated sparkle overlay for your Linux desktop using GTK3 and Cairo.
+A beautiful animated sparkle overlay for your Linux X11 desktop using GTK3 and Cairo.
 
 ## Features
 
