@@ -17,10 +17,10 @@ from gi.repository import Gtk, Gdk, GLib, GdkX11
 # Configuration
 # ============================================================
 
-SPARKLE_COUNT = 10
+SPARKLE_COUNT = 20
 
-MIN_SIZE = 2.0
-MAX_SIZE = 4.0
+MIN_SIZE = 3.0
+MAX_SIZE = 5.0
 
 MIN_LIFETIME = 1.5
 MAX_LIFETIME = 3.0
@@ -28,7 +28,9 @@ MAX_LIFETIME = 3.0
 SPAWN_INTERVAL = 0.05
 FRAME_INTERVAL = 16  # ~60 FPS
 
-SPARKLE_COLOR = (1.0, 1.0, 1.0)
+# Single color: SPARKLE_COLOR = "#EEEEFF"
+# Multiple colors: SPARKLE_COLOR = ["#FF0000", "#FF8800", "#FFFF00", "#00FF00", "#0000FF", "#880088", "#FF00FF"]
+SPARKLE_COLOR = ["#078D70", "#26CEAA", "#98E8C1", "#FFFFFF", "#7BADE2", "#5049CC", "#3D1A78"]
 
 # Pre-computed constants
 RADIANS_PER_DEGREE = math.pi / 180.0
@@ -51,6 +53,45 @@ STAR_TYPES = (
     "six_point",
     "eight_point",
 )
+
+
+# ============================================================
+# Color parsing
+# ============================================================
+
+
+def parse_hex_color(hex_color):
+    """Convert hex color string to RGB tuple."""
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) == 6:
+        r = int(hex_color[0:2], 16) / 255.0
+        g = int(hex_color[2:4], 16) / 255.0
+        b = int(hex_color[4:6], 16) / 255.0
+        return (r, g, b)
+    elif len(hex_color) == 3:
+        r = int(hex_color[0], 16) / 15.0
+        g = int(hex_color[1], 16) / 15.0
+        b = int(hex_color[2], 16) / 15.0
+        return (r, g, b)
+    else:
+        raise ValueError(f"Invalid hex color: {hex_color}")
+
+
+def parse_sparkle_colors(color_config):
+    """Parse SPARKLE_COLOR config to list of RGB tuples."""
+    if isinstance(color_config, str):
+        return [parse_hex_color(color_config)]
+    elif isinstance(color_config, (list, tuple)):
+        return [parse_hex_color(c) for c in color_config]
+    elif isinstance(color_config, tuple) and len(color_config) == 3:
+        # Already an RGB tuple
+        return [color_config]
+    else:
+        raise ValueError(f"Invalid SPARKLE_COLOR config: {color_config}")
+
+
+# Parse colors at module level
+SPARKLE_COLORS = parse_sparkle_colors(SPARKLE_COLOR)
 
 
 # ============================================================
@@ -113,6 +154,8 @@ class Sparkle:
             0.55,
             1.0
         )
+
+        self.color = random.choice(SPARKLE_COLORS)
 
     def age(self, now):
         return now - self.birth
@@ -366,7 +409,7 @@ def draw_sparkle(cr, sparkle, now):
 
     rotation = sparkle.rotation(now) * RADIANS_PER_DEGREE
 
-    r, g, b = SPARKLE_COLOR
+    r, g, b = sparkle.color
 
     cr.save()
 
@@ -548,11 +591,35 @@ class SparkleWindow(Gtk.Window):
             # Click-through - set after window is mapped
             empty_region = cairo.Region()
 
-            gdk_window.input_shape_combine_region(
-                empty_region,
-                0,
-                0
-            )
+            try:
+                gdk_window.input_shape_combine_region(
+                    empty_region,
+                    0,
+                    0
+                )
+            except Exception as e:
+                print(f"Warning: Failed to set click-through on first attempt: {e}")
+                # Retry after a delay
+                GLib.timeout_add(500, self.retry_click_through)
+
+    def retry_click_through(self):
+        """Retry setting click-through in case of early startup issues."""
+        gdk_window = self.get_window()
+
+        if gdk_window is not None:
+            empty_region = cairo.Region()
+            try:
+                gdk_window.input_shape_combine_region(
+                    empty_region,
+                    0,
+                    0
+                )
+                print("Click-through successfully applied on retry")
+                return False  # Stop retrying
+            except Exception as e:
+                print(f"Retry failed: {e}, will try again")
+                return True  # Continue retrying
+        return True  # Continue retrying if window not ready
 
     # ========================================================
     # Draw
