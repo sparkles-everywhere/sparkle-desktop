@@ -1,0 +1,9 @@
+[Unit]
+Description=Desktop Sparkles
+
+[Service]
+ExecStart=/usr/bin/python /home/YOUR_USERNAME/path/to/desktop-sparkles.py
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
